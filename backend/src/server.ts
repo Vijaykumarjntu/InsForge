@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { messagingRouter } from './api/routes/messaging/messaging.routes.js';
 import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
 import { storageRouter } from '@/api/routes/storage/index.routes.js';
@@ -204,6 +205,7 @@ export async function createApp() {
   });
 
   // Mount all routes
+  apiRouter.use('/messaging', messagingRouter);
   apiRouter.use('/auth', authRouter);
   apiRouter.use('/database', databaseRouter);
   apiRouter.use('/storage', storageRouter);

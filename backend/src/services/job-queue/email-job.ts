@@ -37,13 +37,15 @@ export class EmailJobs {
    */
   static async processSendEmail(payload: any): Promise<void> {
     const { template, to, name, variables } = payload;
-
+    console.log(`📧 Attempting to send email:`, { template, to, name, variables });
     try {
       await this.emailService.sendWithTemplate(template, to, name, variables);
       console.log(`✅ Email sent successfully to ${to}`);
     } catch (error) {
-      console.error(`Failed to send email to ${to}:`, error);
-      throw error; // Let the queue retry
+    //   console.error(`Failed to send email to ${to}:`, error);
+    //   throw error; // Let the queue retry
+      console.error(`❌ Failed to send email to ${to} with template ${template}:`, error);
+      throw error; // Important for retry
     }
   }
 }

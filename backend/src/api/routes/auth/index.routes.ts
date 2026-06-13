@@ -58,7 +58,7 @@ import { EMAIL_TEMPLATE_TYPES, type EmailTemplate } from '@/types/email.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
-
+import { EmailService } from '@/services/email/email.service.js'; 
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
@@ -1148,5 +1148,26 @@ router.put(
     }
   }
 );
+
+// Temporary test route - add near the bottom
+router.post('/test-queue', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const emailService = EmailService.getInstance();
+    
+    const jobId = await emailService.queueSendWithTemplate(
+      'email-verification-code',
+      'mvjk443@example.com',
+      'Debug User',
+      { token: '123456' }
+    );
+
+    successResponse(res, { 
+      message: 'Job queued successfully', 
+      jobId 
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

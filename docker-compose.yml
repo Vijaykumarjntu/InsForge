@@ -12,6 +12,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./deploy/docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./deploy/docker-init/db/03-messaging.sql:/docker-entrypoint-initdb.d/03-messaging.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
