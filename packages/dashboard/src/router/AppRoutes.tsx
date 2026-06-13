@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
-import AILayout from '#features/ai/components/AILayout';
+import { lazy, Suspense } from 'react';
+// import AILayout from '#features/ai/components/AILayout';
+const AILayout = lazy(() => import('#features/ai/components/AILayout'));
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
 import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
 import AIModelsPage from '#features/ai/pages/AIModelsPage';
@@ -8,7 +10,9 @@ import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
 import { TrafficPage } from '#features/analytics/pages/TrafficPage';
 import { RetentionPage } from '#features/analytics/pages/RetentionPage';
 import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
-import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
+// import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
+const AuthenticationLayout = lazy(() => import('#features/auth/components/AuthenticationLayout'));
+
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
 import UsersPage from '#features/auth/pages/UsersPage';
@@ -17,7 +21,8 @@ import DashboardLayout from '#features/dashboard/components/DashboardLayout';
 import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
 import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
-import DatabaseLayout from '#features/database/components/DatabaseLayout';
+// import DatabaseLayout from '#features/database/components/DatabaseLayout';
+const DatabaseLayout = lazy(() => import('#features/database/components/DatabaseLayout'));
 import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
 import BackupsPage from '#features/database/pages/BackupsPage';
 import DatabaseFunctionsPage from '#features/database/pages/FunctionsPage';
@@ -87,7 +92,12 @@ function AuthenticatedRoutes() {
         </Route>
         {/* Unified Messaging Center Route */}
         <Route path="/dashboard/messaging" element={<MessagingFeature />} />
-        <Route path="/dashboard/database" element={<DatabaseLayout />}>
+        {/* <Route path="/dashboard/database" element={<DatabaseLayout />} > */}
+        <Route path="/dashboard/database" element={
+            <Suspense fallback={<div className="p-6">Loading database tools...</div>}>
+              <DatabaseLayout />
+            </Suspense>
+          }>
           <Route index element={<Navigate to="tables" replace />} />
           <Route path="tables" element={<TablesPage />} />
           <Route path="indexes" element={<IndexesPage />} />

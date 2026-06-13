@@ -24,17 +24,51 @@ export default defineConfig({
     },
   },
   build: {
+    // lib: {
+    //   entry: path.resolve(__dirname, 'src/index.ts'),
+    //   formats: ['es'],
+    //   fileName: () => 'index.js',
+    // },
+    // cssCodeSplit: false,
+    // rollupOptions: {
+    //   external: ['react', 'react-dom'],
+    //   output: {
+    //     assetFileNames: (assetInfo) =>
+    //       assetInfo.name?.endsWith('.css') ? 'styles.css' : 'assets/[name]-[hash][extname]',
+    //   },
+    // },
+    // lib: {
+    //   entry: path.resolve(__dirname, 'src/index.ts'),
+    //   formats: ['es'],
+    // },
+    // cssCodeSplit: true, // Allow features to split their own CSS chunks
+    // rollupOptions: {
+    //   external: ['react', 'react-dom'],
+    //   output: {
+    //     // This preserves the internal directory structure in the dist folder
+    //     preserveModules: true,
+    //     preserveModulesRoot: 'src',
+    //     entryFileNames: '[name].js',
+    //     assetFileNames: 'assets/[name]-[hash][extname]',
+    //   },
+    // },
     lib: {
       entry: path.resolve(__dirname, 'src/index.ts'),
       formats: ['es'],
-      fileName: () => 'index.js',
     },
-    cssCodeSplit: false,
+    cssCodeSplit: true,
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      // Pinpoint and externalize all third-party and workspace monorepo modules
+      external: (id) => 
+        /node_modules/.test(id) || 
+        id.startsWith('@insforge/') || 
+        id.startsWith('react') || 
+        id.startsWith('lucide-react'),
       output: {
-        assetFileNames: (assetInfo) =>
-          assetInfo.name?.endsWith('.css') ? 'styles.css' : 'assets/[name]-[hash][extname]',
+        preserveModules: true,
+        preserveModulesRoot: 'src',
+        entryFileNames: '[name].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
   },
