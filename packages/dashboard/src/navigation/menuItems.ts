@@ -6,6 +6,7 @@ import {
   HardDrive,
   Code2,
   Radio,
+  MessageSquare,
   Server,
   Sparkles,
   ChartLine,
@@ -95,6 +96,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Realtime',
     href: '/dashboard/realtime',
     icon: Radio,
+  },
+  {
+    id: 'messaging',
+    label: 'Messaging Layer',
+    href: '/dashboard/messaging',
+    icon: MessageSquare,
   },
   {
     id: 'ai',

@@ -57,6 +57,7 @@ import StorageLayout from '#features/storage/components/StorageLayout';
 import BucketsPage from '#features/storage/pages/BucketsPage';
 import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
+import { MessagingFeature } from '../features/messaging/MessagingFeature';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
@@ -84,6 +85,8 @@ function AuthenticatedRoutes() {
           <Route path="auth-methods" element={<AuthMethodsPage />} />
           <Route path="email" element={<EmailPage />} />
         </Route>
+        {/* Unified Messaging Center Route */}
+        <Route path="/dashboard/messaging" element={<MessagingFeature />} />
         <Route path="/dashboard/database" element={<DatabaseLayout />}>
           <Route index element={<Navigate to="tables" replace />} />
           <Route path="tables" element={<TablesPage />} />
