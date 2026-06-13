@@ -328,9 +328,15 @@ export class AuthService {
     // Send email with verification code
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'email-verification-code', {
-      token: code,
-    });
+    // await emailService.queueSendWithTemplate(email, userName, 'email-verification-code', {
+    //   token: code,
+    // });
+    await emailService.queueSendWithTemplate(
+      'email-verification-code',
+      email,
+      userName,
+      { token: code }        // ← variables object
+    );
   }
 
   /**
@@ -364,9 +370,21 @@ export class AuthService {
     // Send email with verification link
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'email-verification-link', {
-      link: linkUrl,
-    });
+    // await emailService.queueSendWithTemplate(email, userName, 'email-verification-link', {
+    //   link: linkUrl,
+    // });
+    // await emailService.queueSendWithTemplate(
+    //   'email-verification-code',   // template name first
+    //   email,                       // to
+    //   userName,                    // name
+    //   { token: code }              // variables
+    // );
+    await emailService.queueSendWithTemplate(
+      'email-verification-link',     // template name
+      email,
+      userName,
+      { link: linkUrl }              // ← correct variable
+    );
   }
 
   /**
@@ -517,9 +535,15 @@ export class AuthService {
     // Send email with reset password code
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'reset-password-code', {
-      token: code,
-    });
+    // await emailService.queueSendWithTemplate(email, userName, 'reset-password-code', {
+    //   token: code,
+    // });
+    await emailService.queueSendWithTemplate(
+      'reset-password-code',
+      email,
+      userName,
+      { token: code }
+    );
   }
 
   /**
@@ -552,7 +576,7 @@ export class AuthService {
     // Send email with password reset link
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'reset-password-link', {
+    await emailService.queueSendWithTemplate(email, userName, 'reset-password-link', {
       link: linkUrl,
     });
   }

@@ -122,4 +122,18 @@ export class EmailService {
       }
     }
   }
+
+    /**
+   * Queue email for async sending (recommended for auth flows)
+   */
+  async queueSendWithTemplate(
+    template: string,
+    to: string,
+    name: string,
+    variables: Record<string, any> = {}
+  ): Promise<string> {
+    // Import dynamically to avoid circular dependency
+    const { EmailJobs } = await import('../job-queue/email-job.js');
+    return EmailJobs.queueEmail(template, to, name, variables);
+  }
 }
