@@ -93,3 +93,94 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     }
   });
 });
+
+describe('DatabaseAdvanceService - runAdvisorScan Integration Seeding', () => {
+  const service = DatabaseAdvanceService.getInstance();
+
+  test('triggers and captures the "rls-disabled" rule against a raw seeded table', async () => {
+    // 1. Seed a temporary insecure table explicitly without RLS enabled
+    await service.executeRawSQL('DROP TABLE IF EXISTS public.test_vulnerable_leak;');
+    await service.executeRawSQL('CREATE TABLE public.test_vulnerable_leak (id uuid PRIMARY KEY, secret_data text);');
+
+    try {
+      // 2. Trigger the Advisor Scan execution pipeline
+      const result = await service.runAdvisorScan();
+
+      // 3. Assert that the rule-id engine successfully catches the vulnerability
+      const rlsFinding = result.findings.find(f => f.ruleId === 'rls-disabled' && f.title.includes('test_vulnerable_leak'));
+      expect(rlsFinding).toBeDefined();
+      expect(rlsFinding?.category).toBe('security');
+      expect(rlsFinding?.impact).toBe('CRITICAL');
+      expect(rlsFinding?.resolution).toContain('ENABLE ROW LEVEL SECURITY');
+    } finally {
+      // Clean up after the integration test run
+      await service.executeRawSQL('DROP TABLE IF EXISTS public.test_vulnerable_leak;');
+    }
+  });
+
+  test('triggers and captures the "dangerous-function" rule against an exposed SECURITY DEFINER routine', async () => {
+    // 1. Seed an insecure SECURITY DEFINER function
+    await service.executeRawSQL('DROP FUNCTION IF EXISTS public.test_leaky_privileges();');
+    await service.executeRawSQL(`
+      CREATE OR REPLACE FUNCTION public.test_leaky_privileges()
+      RETURNS void AS $$
+      BEGIN
+        PERFORM 1;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+    `);
+
+    try {
+      // 2. Scan the active database catalog state
+      const result = await service.runAdvisorScan();
+
+      // 3. Assert that the dangerous routine was successfully flagged
+      const funcFinding = result.findings.find(f => f.ruleId === 'dangerous-function' && f.title.includes('test_leaky_privileges'));
+      expect(funcFinding).toBeDefined();
+      expect(funcFinding?.category).toBe('security');
+      expect(funcFinding?.impact).toBe('CRITICAL');
+    } finally {
+      // Clean up the routine tracking context
+      await service.executeRawSQL('DROP FUNCTION IF EXISTS public.test_leaky_privileges();');
+    }
+  });
+
+  test('triggers and captures the "missing-fk-index" rule when parsing unindexed relational references', async () => {
+    // 1. Setup a standard parent-child relationship missing an explicit index on the foreign key column
+    await service.executeRawSQL('DROP TABLE IF EXISTS public.test_child_logs;');
+    await service.executeRawSQL('DROP TABLE IF EXISTS public.test_parent_users;');
+    
+    await service.executeRawSQL('CREATE TABLE public.test_parent_users (id int PRIMARY KEY);');
+    await service.executeRawSQL(`
+      CREATE TABLE public.test_child_logs (
+        id int PRIMARY KEY, 
+        user_id int REFERENCES public.test_parent_users(id)
+      );
+    `);
+
+    try {
+      // 2. Run the advisor scanner loop
+      const result = await service.runAdvisorScan();
+
+      // 3. Verify that the performance engine successfully recommends an index action
+      const fkFinding = result.findings.find(f => f.ruleId === 'missing-fk-index' && f.title.includes('test_child_logs'));
+      expect(fkFinding).toBeDefined();
+      expect(fkFinding?.category).toBe('performance');
+      expect(fkFinding?.resolution).toContain('CREATE INDEX');
+    } finally {
+      // Clean up structural states
+      await service.executeRawSQL('DROP TABLE IF EXISTS public.test_child_logs;');
+      await service.executeRawSQL('DROP TABLE IF EXISTS public.test_parent_users;');
+    }
+  });
+
+  test('enforces the single-concurrency in-memory execution lock', async () => {
+    // Fire off two scans simultaneously to verify that the atomic flag rejects overlapping requests
+    const scanOnePromise = service.runAdvisorScan();
+    
+    await expect(service.runAdvisorScan()).rejects.toThrowError(/already in progress/);
+    
+    // Resolve the first scan cleanly so we don't leak unreleased pool clients
+    await scanOnePromise;
+  });
+});

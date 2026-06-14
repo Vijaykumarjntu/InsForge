@@ -99,6 +99,33 @@ router.post(
 );
 
 /**
+ * Database Advisor Scanning Routine
+ * POST /api/advisor/scan
+ * Accessible strictly via Admin Authorization loops
+ */
+router.post(
+  '/advisor/scan',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const results = await dbAdvanceService.runAdvisorScan();
+      
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'RUN_DATABASE_ADVISOR_SCAN',
+        module: 'ADVISOR',
+        details: { findings_discovered: results.summary.recommendationsCount },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, results);
+    } catch (error: unknown) {
+      next(error);
+    }
+  }
+);
+
+/**
  * Execute raw SQL query with project_admin privileges.
  * POST /api/database/advance/rawsql
  */

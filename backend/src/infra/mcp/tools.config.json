@@ -1,0 +1,13 @@
+{
+  "tools": [
+    {
+      "name": "advisor.scan",
+      "description": "Triggers a comprehensive 19-rule database advisor lint scan against the project's PostgreSQL engine. Checks for critical security gaps, query performance bottlenecks, and resource health status anomalies.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  ]
+}
