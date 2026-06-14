@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: ghcr.io/insforge/postgres:v15.13.4
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c shared_buffers=64MB -c max_connections=20
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql:ro
+      - ./deploy/docker-init/db/03-messaging.sql:/docker-entrypoint-initdb.d/03-messaging.sql:ro
+      - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    ports:
+      - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - insforge-student-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 3
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
+    ports:
+      - "5430:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - insforge-student-net
+
+volumes:
+  postgres-data:
+
+networks:
+  insforge-student-net:
+    driver: bridge
