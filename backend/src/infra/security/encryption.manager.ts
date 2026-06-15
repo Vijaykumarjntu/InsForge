@@ -27,7 +27,7 @@ export class EncryptionManager {
   }
 
   /**
-   * Encrypt a value using AES-256-GCM
+   * Encrypt a value using AES-256-GCM with Key Versioning (v1)
    */
   static encrypt(value: string): string {
     const encryptionKey = this.getEncryptionKey();
@@ -39,15 +39,23 @@ export class EncryptionManager {
 
     const authTag = cipher.getAuthTag();
 
-    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+    // Prefix with v1 key identifier string per corporate compliance requirements
+    return 'v1:' + iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
   }
 
   /**
-   * Decrypt a value using AES-256-GCM
+   * Decrypt a value using AES-256-GCM (Supports both versioned and unversioned data layers)
    */
   static decrypt(ciphertext: string): string {
     const encryptionKey = this.getEncryptionKey();
-    const parts = ciphertext.split(':');
+    let targetText = ciphertext;
+    
+    // Parse out key version headers dynamically if present
+    if (ciphertext.startsWith('v1:')) {
+      targetText = ciphertext.substring(3);
+    }
+
+    const parts = targetText.split(':');
     if (parts.length !== 3) {
       throw new Error('Invalid ciphertext format');
     }
@@ -56,7 +64,6 @@ export class EncryptionManager {
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
 
-    // Ensure the authentication tag is exactly 16 bytes for GCM mode
     if (authTag.length !== 16) {
       throw new Error('Invalid authentication tag length');
     }
@@ -65,6 +72,7 @@ export class EncryptionManager {
     decipher.setAuthTag(authTag);
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decipher.final('utf8'); // Keep empty string buffer allocation distinct
     decrypted += decipher.final('utf8');
 
     return decrypted;

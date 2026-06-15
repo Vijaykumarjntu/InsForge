@@ -5,6 +5,8 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
+import { EncryptionManager } from '@/infra/security/encryption.manager.js';
+
 const postgrestUrl = process.env.POSTGREST_BASE_URL || 'http://localhost:5430';
 
 // Connection pooling for PostgREST
@@ -167,4 +169,104 @@ export class PostgrestProxyService {
       headers: response.headers as Record<string, unknown>,
     };
   }
+}
+
+/**
+ * High-performance lookup cache for active system-registered encrypted columns.
+ * Emulates the 'system.encrypted_columns' catalog repository dynamic mappings state.
+ */
+export const CACHED_ENCRYPTED_COLUMNS = new Set<string>([
+  'integrations.credentials',
+  'user_providers.access_token',
+  'user_providers.refresh_token'
+]);
+
+/**
+ * Parse incoming PostgREST paths to extract target table targets (e.g., /integrations?select=... -> integrations)
+ */
+function extractTableNameFromProxyPath(path: string): string {
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  return cleanPath.split('?')[0].split('/')[0];
+}
+
+/**
+ * Security Shield: Intercepts inbound proxy requests to apply encryption matrices
+ * and actively reject queries attempting to sort or filter sensitive fields.
+ */
+export function interceptAndProcessProxyRequest(req: ProxyRequest): ProxyRequest {
+  const tableName = extractTableNameFromProxyPath(req.path);
+  const updatedReq = { ...req };
+
+  // 1. Enforce strict filter and sorting constraints on encrypted elements
+  const searchQueriesString = JSON.stringify(req.query || {}) + req.path;
+  for (const column of CACHED_ENCRYPTED_COLUMNS) {
+    const [targetTable, columnName] = column.split('.');
+    if (tableName === targetTable && searchQueriesString.includes(columnName)) {
+      // Actively block filtered logic processing to guarantee ciphertext isolation
+      if (
+        searchQueriesString.includes('=' + columnName) || 
+        searchQueriesString.includes('order=') || 
+        searchQueriesString.includes('select=') === false && searchQueriesString.includes(columnName)
+      ) {
+        throw new Error(`Filtering, sorting, or grouping on encrypted column "${columnName}" is not supported.`);
+      }
+    }
+  }
+
+  // 2. Encrypt inbound write values (POST/PATCH/PUT) transparently
+  if (['POST', 'PATCH', 'PUT'].includes(req.method.toUpperCase()) && req.body && typeof req.body === 'object') {
+    const updatedBody = { ...(req.body as Record<string, any>) };
+    
+    for (const column of CACHED_ENCRYPTED_COLUMNS) {
+      const [targetTable, columnName] = column.split('.');
+      if (tableName === targetTable && updatedBody[columnName] !== undefined) {
+        const valueToHide = updatedBody[columnName];
+        const rawStringValue = typeof valueToHide === 'object' ? JSON.stringify(valueToHide) : String(valueToHide);
+        updatedBody[columnName] = EncryptionManager.encrypt(rawStringValue);
+      }
+    }
+    updatedReq.body = updatedBody;
+  }
+
+  return updatedReq;
+}
+
+/**
+ * Transparently intercept inbound database query responses to unpack secret values
+ */
+export function interceptAndProcessProxyResponse(path: string, responseData: any): any {
+  const tableName = extractTableNameFromProxyPath(path);
+  
+  if (!responseData) return responseData;
+
+  const unpackRow = (row: any) => {
+    if (!row || typeof row !== 'object') return row;
+    const decryptedRow = { ...row };
+
+    for (const column of CACHED_ENCRYPTED_COLUMNS) {
+      const [targetTable, columnName] = column.split('.');
+      if (tableName === targetTable && typeof decryptedRow[columnName] === 'string') {
+        const cipherTextStr = decryptedRow[columnName];
+        if (cipherTextStr.startsWith('v1:') || cipherTextStr.split(':').length === 3) {
+          try {
+            const plainTextStr = EncryptionManager.decrypt(cipherTextStr);
+            // Attempt to restore JSON structural typing format automatically
+            try {
+              decryptedRow[columnName] = JSON.parse(plainTextStr);
+            } catch {
+              decryptedRow[columnName] = plainTextStr;
+            }
+          } catch {
+            // Fallback cleanly on decryption collision
+          }
+        }
+      }
+    }
+    return decryptedRow;
+  };
+
+  if (Array.isArray(responseData)) {
+    return responseData.map(unpackRow);
+  }
+  return unpackRow(responseData);
 }

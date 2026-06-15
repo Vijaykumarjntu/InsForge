@@ -1,6 +1,7 @@
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName, validateTableName } from '@/utils/validations.js';
+import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
 
@@ -74,4 +75,65 @@ export function splitQualifiedTableReference(
     schemaName,
     tableName,
   };
+}
+
+
+/**
+ * Global Column-Level Encryption Registry
+ * Maps fully qualified table names or specific columns to automatic cryptographic handling.
+ */
+export const ENCRYPTED_COLUMNS_REGISTRY = new Set<string>([
+  'public.users.ssn',
+  'public.users.tax_id',
+  'public.projects.api_key',
+  'public.projects.secret_token'
+]);
+
+/**
+ * Transparently encrypts registered sensitive fields within an outbound payload object.
+ */
+export function encryptRecordFields(schemaName: string, tableName: string, payload: Record<string, any>): Record<string, any> {
+  if (!payload || typeof payload !== 'object') return payload;
+  
+  const encryptedPayload = { ...payload };
+  const targetSchema = schemaName || DEFAULT_DATABASE_SCHEMA;
+
+  for (const key of Object.keys(encryptedPayload)) {
+    const qualifiedColumnPath = `${targetSchema}.${tableName}.${key}`;
+    
+    if (ENCRYPTED_COLUMNS_REGISTRY.has(qualifiedColumnPath)) {
+      const plainValue = encryptedPayload[key];
+      
+      // Ensure we only process non-null, defined string expressions
+      if (typeof plainValue === 'string' && plainValue.trim().length > 0) {
+        encryptedPayload[key] = EncryptionManager.encrypt(plainValue);
+      }
+    }
+  }
+
+  return encryptedPayload;
+}
+
+/**
+ * Safely decodes any detected encrypted string tokens inside an inbound database record.
+ */
+export function decryptRecordFields(record: Record<string, any>): Record<string, any> {
+  if (!record || typeof record !== 'object') return record;
+
+  const decryptedRecord = { ...record };
+
+  for (const key of Object.keys(decryptedRecord)) {
+    const mixedValue = decryptedRecord[key];
+
+    // Detect our EncryptionManager's distinct structural footprint (iv:authTag:ciphertext)
+    if (typeof mixedValue === 'string' && mixedValue.split(':').length === 3) {
+      try {
+        decryptedRecord[key] = EncryptionManager.decrypt(mixedValue);
+      } catch {
+        // Fall back gracefully to the original string value if it's not a true crypt token
+      }
+    }
+  }
+
+  return decryptedRecord;
 }
