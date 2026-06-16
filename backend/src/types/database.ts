@@ -134,5 +134,53 @@ export type DatabaseValue =
   | DatabaseValue[]
   | { [key: string]: DatabaseValue }; // jsonB type
 
+
+/**
+ * Strict structural type definition for individual execution nodes 
+ * emitted by PostgreSQL's EXPLAIN (FORMAT JSON) engine.
+ */
+export interface PostgresPlanNode {
+  'Node Type': string;
+  'Strategy'?: string;
+  'Operation'?: string;
+  'Parallel Aware'?: boolean;
+  'Startup Cost': number;
+  'Total Cost': number;
+  'Plan Rows': number;
+  'Plan Width': number;
+  'Actual Startup Time'?: number;
+  'Actual Total Time'?: number;
+  'Actual Rows'?: number;
+  'Actual Loops'?: number;
+  'Output'?: string[];
+  'Shared Hit Blocks'?: number;
+  'Shared Read Blocks'?: number;
+  'Shared Dirtied Blocks'?: number;
+  'Shared Written Blocks'?: number;
+  'Plans'?: PostgresPlanNode[]; // Recursive structural sub-nodes (Joins, Index scans, etc.)
+}
+
+/**
+ * Root wrapper array format returned natively by Postgres
+ */
+export interface PostgresExplainPlanRoot {
+  'Plan': PostgresPlanNode;
+  'Planning Time'?: number;
+  'Execution Time'?: number;
+  'Triggers'?: any[];
+}
+
+export interface VisualizerPlanMetrics {
+  totalCost: number;
+  executionTimeMs: number;
+  hasSequentialScan: boolean;
+  scanOperations: string[];
+}
+
+export interface ExplainPlanResponsePayload {
+  rawPlan: PostgresExplainPlanRoot | PostgresExplainPlanRoot[];
+  metrics: VisualizerPlanMetrics;
+}
+
 // Generic database record type - used when we don't know the exact table structure
 export type DatabaseRecord = Record<string, DatabaseValue>;

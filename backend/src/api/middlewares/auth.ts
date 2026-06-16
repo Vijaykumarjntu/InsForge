@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import logger from '@/utils/logger.js';
 
 export type UserContext = {
   id?: string;
@@ -75,6 +76,7 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
+  logger.info("now we are inside the verifiy admin");
   if (apiKey) {
     return verifyApiKey(req, res, next);
   }
@@ -83,7 +85,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
       throw new AppError(
-        'No admin token provided',
+        'No admin token provided dumb idiot',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
@@ -95,7 +97,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
 
     if (payload.role !== 'project_admin') {
       throw new AppError(
-        'Admin access required',
+        'Admin access required you dumb idiot',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED,
         NEXT_ACTIONS.CHECK_ADMIN_TOKEN

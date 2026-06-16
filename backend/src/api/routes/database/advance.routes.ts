@@ -19,6 +19,19 @@ import { successResponse } from '@/utils/response.js';
 import { analyzeQuery, type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { buildQualifiedTableKey } from '@/services/database/helpers.js';
 
+import { QueryVisualizerService } from '@/services/database/query-visualizer.service.js';
+import { PostgresExplainPlanRoot, VisualizerPlanMetrics } from '@/types/database.js';
+import { explainQueryRequestSchema } from '@insforge/shared-schemas'; // Or import your localized definition
+
+
+// Define the response shape contract directly at the gate of the route file
+interface ExplainPlanResponsePayload {
+  rawPlan: PostgresExplainPlanRoot[];
+  metrics: VisualizerPlanMetrics;
+}
+
+const visualizerService = QueryVisualizerService.getInstance();
+
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const auditService = AuditService.getInstance();
@@ -132,6 +145,10 @@ router.post(
 router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Validate request body
+    // 🛠️ Force a flat, unbuffered string output that Docker cannot ignore
+    logger.info("🚨 🚨 🚨 FORCE PRINT: WE ARE ABSOLUTELY INSIDE THE RAWSQL ROUTE HANDLER 🚨 🚨 🚨");
+    // logger.info({message: "we are inside the explain route"});
+    // alert("this is inside the rawsql");
     const validation = rawSQLRequestSchema.safeParse(req.body);
     if (!validation.success) {
       throw new AppError(
@@ -379,5 +396,81 @@ router.post(
     }
   }
 );
+
+
+/**
+ * @route   POST /api/database/advance/explain
+ * @desc    Generates transaction-isolated EXPLAIN ANALYZE visual plan tree telemetry
+ * @access  Admin Only (Matches Supabase experience natively)
+ */
+router.post(
+  '/explain',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // 1. Enforce strict type validation layout matching rawSQLRequestSchema routines
+      logger.info({message: "we are inside the explain route",});
+      const parseResult = explainQueryRequestSchema.safeParse(req.body);
+      console.log("this is the req body which we are using");
+      console.log(req.body);
+      if (!parseResult.success) {
+        throw new AppError('Invalid explain request payload data properties', 400,ERROR_CODES.INVALID_INPUT);
+      }
+
+      const { query } = parseResult.data;
+      logger.info(`SQL Editor: Admin user ${req.user?.id || 'agent'} requested Explain tree diagram execution`);
+
+      // 2. Invoke the performance visualizer isolation engine
+      const planResult = await visualizerService.generateExplainPlan(query);
+
+      // 3. Dispatch uniform success response back to dashboard UI tab
+      // res.status(200).json(
+      //   successResponse({
+      //     rawPlan: planResult.rawPlan,
+      //     metrics: planResult.metrics
+      //   }, 'Execution plan generated successfully')
+      // );
+
+      // 3. Dispatch uniform success response back to dashboard UI tab
+      // res.status(200).json(
+      //   successResponse<ExplainPlanResponsePayload>({
+      //     rawPlan: planResult.rawPlan,
+      //     metrics: planResult.metrics
+      //   }, 'Execution plan generated successfully')
+      // );
+      // 3. Dispatch uniform success response back to dashboard UI tab
+      // res.status(200).json(
+      //   successResponse({
+      //     rawPlan: planResult.rawPlan,
+      //     metrics: planResult.metrics
+      //   } as any, 'Execution plan generated successfully')
+      // );
+      // Alternative option if successResponse is an Express runner utility:
+      // 3. Dispatch uniform success response back to dashboard UI tab safely
+      res.status(200).json({
+        success: true,
+        message: 'Execution plan generated successfully',
+        data: {
+          rawPlan: planResult.rawPlan,
+          metrics: planResult.metrics
+        }
+      });
+      return;
+
+    } catch (error: any) {
+      logger.error(`Explain Route Error: ${error.message}`);
+      
+      // Acceptance Criteria: Render syntax/permission errors readably without breaking components
+      // res.status(200).json({
+      //   success: false,
+      //   error: error.message || 'Database optimizer failed to parse execution plan tree structure.'
+      // });
+      // 🛠️ Pass the error along to next() so your Docker framework logger prints the standard HTTP Request info line
+      next(error);
+    }
+  }
+);
+
+// export default router;
 
 export default router;

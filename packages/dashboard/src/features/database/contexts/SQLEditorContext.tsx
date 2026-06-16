@@ -6,6 +6,7 @@ import {
   setLocalStorageItem,
   setLocalStorageJSON,
 } from '#lib/utils/local-storage';
+import { apiClient } from '#lib/api/client';
 
 export interface SQLTab {
   id: string;

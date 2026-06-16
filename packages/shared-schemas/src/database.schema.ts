@@ -122,8 +122,14 @@ export const migrationSchema = z.object({
   createdAt: z.string(),
 });
 
+
+export const explainQueryRequestSchema = z.object({
+  query: z.string().min(1, 'SQL Query string cannot be empty'),
+});
+
 export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
 export type DatabaseIndex = z.infer<typeof databaseIndexSchema>;
 export type DatabasePolicy = z.infer<typeof databasePolicySchema>;
 export type DatabaseTrigger = z.infer<typeof databaseTriggerSchema>;
 export type Migration = z.infer<typeof migrationSchema>;
+export type explainQueryRequest = z.infer<typeof explainQueryRequestSchema>;

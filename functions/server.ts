@@ -1,5 +1,7 @@
 import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
+// import { Client } from "./vendor/postgres.ts";
 import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.224.0/path/mod.ts';
+// import { join, dirname, from_file_url } from './vendor/path.ts';
 
 /* eslint-disable no-console */
 const rawPort = Deno.env.get('PORT');
