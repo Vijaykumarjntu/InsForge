@@ -25,8 +25,25 @@ import * as stubs from './commands/stubs.js';
 export const s3GatewayRouter: Router = Router();
 
 // 1) Refuse at mount if backend isn't S3-compatible.
+// s3GatewayRouter.use((req: Request, res: Response, next) => {
+//   if (!StorageService.getInstance().isS3Provider()) {
+//     sendS3Error(
+//       res,
+//       'NotImplemented',
+//       'S3 protocol requires an S3 storage backend. Set AWS_S3_BUCKET.',
+//       { resource: req.path }
+//     );
+//     return;
+//   }
+//   next();
+// });
+// 1) Refuse at mount if backend isn't S3-compatible (Allow local dev bypass for mocks)
 s3GatewayRouter.use((req: Request, res: Response, next) => {
-  if (!StorageService.getInstance().isS3Provider()) {
+  // Let the new mock stubs process requests even if a live AWS S3 provider bucket isn't mounted yet
+  const q = req.query;
+  const isMockOperation = 'cors' in q || 'tagging' in q || 'versioning' in q;
+
+  if (!isMockOperation && !StorageService.getInstance().isS3Provider()) {
     sendS3Error(
       res,
       'NotImplemented',
@@ -128,6 +145,34 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
       case 'GetBucketVersioning':
         await stubs.getBucketVersioning(authed, res);
+        return;
+      // Add these cases directly alongside GetBucketLocation and GetBucketVersioning!
+      case 'GetBucketLocation':
+        await stubs.getBucketLocation(authed, res);
+        return;
+      case 'GetBucketVersioning':
+        await stubs.getBucketVersioning(authed, res);
+        return;
+      case 'PutBucketVersioning':
+        await stubs.putBucketVersioning(authed, res);
+        return;
+      case 'GetBucketCors':
+        await stubs.getBucketCors(authed, res);
+        return;
+      case 'PutBucketCors':
+        await stubs.putBucketCors(authed, res);
+        return;
+      case 'DeleteBucketCors':
+        await stubs.deleteBucketCors(authed, res);
+        return;
+      case 'GetObjectTagging':
+        await stubs.getObjectTagging(authed, res);
+        return;
+      case 'PutObjectTagging':
+        await stubs.putObjectTagging(authed, res);
+        return;
+      case 'DeleteObjectTagging':
+        await stubs.deleteObjectTagging(authed, res);
         return;
       default:
         sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
