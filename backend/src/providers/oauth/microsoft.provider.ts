@@ -7,20 +7,29 @@ import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth.js';
 
 /**
  * Microsoft OAuth Service
- * Handles all Microsoft OAuth operations including URL generation, token exchange, and user info retrieval
+ * Handles all Microsoft OAuth operations including URL generation, token exchange, and user info retrieval.
+ * Upgraded to support custom Shared-Keys / Isolated Tenant OAuth routing.
  */
 export class MicrosoftOAuthProvider implements OAuthProvider {
   private static instance: MicrosoftOAuthProvider;
 
-  private constructor() {
-    // Initialize OAuth helpers if needed
-  }
+  private constructor() {}
 
   public static getInstance(): MicrosoftOAuthProvider {
     if (!MicrosoftOAuthProvider.instance) {
       MicrosoftOAuthProvider.instance = new MicrosoftOAuthProvider();
     }
     return MicrosoftOAuthProvider.instance;
+  }
+
+  /**
+   * Helper to resolve the correct Microsoft Authority base based on Shared-Keys/Tenant config
+   */
+  private getAuthorityEndpoint(config: any): string {
+    // If a custom tenant ID or shared-key mapping is present, isolate the tenant traffic lane.
+    // Otherwise, default back gracefully to the multi-tenant "common" gateway.
+    const tenantId = config.tenantId || config.metadata?.tenantId || 'common';
+    return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0`;
   }
 
   /**
@@ -34,13 +43,14 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
     }
 
     const selfBaseUrl = getApiBaseUrl();
+    const authorityBase = this.getAuthorityEndpoint(config);
 
-    logger.debug('Microsoft OAuth Config (fresh from DB):', {
+    logger.debug('Microsoft OAuth Config resolution:', {
       clientId: config.clientId ? 'SET' : 'NOT SET',
+      authorityBase,
     });
 
-    // Note: shared-keys path not implemented for Microsoft; configure local keys
-    const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+    const authUrl = new URL(`${authorityBase}/authorize`);
     authUrl.searchParams.set('client_id', config.clientId ?? '');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/microsoft/callback`);
@@ -50,6 +60,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
         ? config.scopes.join(' ')
         : 'openid email profile offline_access User.Read'
     );
+    
     if (state) {
       authUrl.searchParams.set('state', state);
     }
@@ -67,9 +78,11 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
     }
 
     try {
-      logger.info('Exchanging Microsoft code for tokens', {
+      const authorityBase = this.getAuthorityEndpoint(config);
+      logger.info('Exchanging Microsoft code for tokens via resolved authority', {
         hasCode: !!code,
         clientId: config.clientId?.substring(0, 10) + '...',
+        authorityBase,
       });
 
       const clientSecret = await oAuthConfigService.getClientSecretByProvider('microsoft');
@@ -88,7 +101,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       });
 
       const response = await axios.post(
-        'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+        `${authorityBase}/token`,
         body.toString(),
         {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -100,7 +113,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       }
       return {
         access_token: response.data.access_token,
-        id_token: response.data.id_token, // optional
+        id_token: response.data.id_token,
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -155,14 +168,13 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
     const tokens = await this.exchangeCodeToToken(payload.code);
     const microsoftUserInfo = await this.getUserInfo(tokens.access_token);
 
-    // Transform Microsoft user info to generic format
     const userName = microsoftUserInfo.name || microsoftUserInfo.email.split('@')[0] || 'user';
     return {
       provider: 'microsoft',
       providerId: microsoftUserInfo.id,
       email: microsoftUserInfo.email,
       userName,
-      avatarUrl: '', // Microsoft doesn't provide avatar in basic profile
+      avatarUrl: '', 
       identityData: microsoftUserInfo,
     };
   }

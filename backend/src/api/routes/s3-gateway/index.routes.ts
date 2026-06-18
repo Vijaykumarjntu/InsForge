@@ -147,12 +147,12 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         await stubs.getBucketVersioning(authed, res);
         return;
       // Add these cases directly alongside GetBucketLocation and GetBucketVersioning!
-      case 'GetBucketLocation':
-        await stubs.getBucketLocation(authed, res);
-        return;
-      case 'GetBucketVersioning':
-        await stubs.getBucketVersioning(authed, res);
-        return;
+      // case 'GetBucketLocation':
+      //   await stubs.getBucketLocation(authed, res);
+      //   return;
+      // case 'GetBucketVersioning':
+      //   await stubs.getBucketVersioning(authed, res);
+      //   return;
       case 'PutBucketVersioning':
         await stubs.putBucketVersioning(authed, res);
         return;
