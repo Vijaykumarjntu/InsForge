@@ -865,4 +865,102 @@ export class DatabaseTableService {
     });
     return foreignKeyMap;
   }
+
+  /**
+   * Stream an entire database table directly into an HTTP response stream as CSV format
+   * Keeps memory overhead completely flat (O(1) memory complexity) via batch boundaries
+   */
+  async streamTableToCsv(schemaName: string, table: string, outputStream: Response): Promise<void> {
+    validateSchemaName(schemaName);
+    validateIdentifier(table, 'table');
+
+    const safeQualifiedTableName = quoteQualifiedName(schemaName, table);
+    const client = await this.getPool().connect();
+
+    try {
+      // 1. Fetch live column definitions to guarantee safe ordering and headers mapping
+      const columnsResult = await client.query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = $1
+          AND table_name = $2
+          ORDER BY ordinal_position
+        `,
+        [schemaName, table]
+      );
+
+      const columnsList: string[] = columnsResult.rows.map((r: { column_name: string }) => r.column_name);
+      if (columnsList.length === 0) {
+        throw new AppError(
+          'Target table not found or has no defined attributes to export.',
+          404,
+          ERROR_CODES.DATABASE_NOT_FOUND,
+          'Please verify the table name parameter.'
+        );
+      }
+
+      // Helper function to escape standard values safely into RFC 4180 CSV specifications
+      const escapeCsvCell = (val: any): string => {
+        if (val === null || val === undefined) {
+          return '';
+        }
+        let strVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        // If the value contains quotes, commas, or line breaks, double up internal quotes and wrap the cell
+        if (strVal.includes('"') || strVal.includes(',') || strVal.includes('\n') || strVal.includes('\r')) {
+          return `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+      };
+
+      // 2. Flush out the initial headers header record segment down the pipeline wires
+      const headerRow = columnsList.map(escapeCsvCell).join(',') + '\n';
+      outputStream.write(headerRow);
+
+      // 3. Execute the memory-bounded cursor block extractor loop
+      const CHUNK_SIZE = 2000;
+      let currentOffset = 0;
+      let activeFetchLoop = true;
+
+      // Construct dynamic safe selected targets column mappings segment
+      const safeColumnsSelect = columnsList.map(col => this.quoteIdentifier(col)).join(', ');
+
+      while (activeFetchLoop) {
+        // Run a high-performance slice across the index space using absolute tracking sorting
+        const dataQuery = `
+          SELECT ${safeColumnsSelect}
+          FROM ${safeQualifiedTableName}
+          ORDER BY 1
+          LIMIT ${CHUNK_SIZE} OFFSET ${currentOffset}
+        `;
+
+        const chunkResult = await client.query(dataQuery);
+        const rows = chunkResult.rows;
+
+        if (rows.length === 0) {
+          activeFetchLoop = false;
+          break;
+        }
+
+        // Process data chunk directly into buffer strings
+        let csvLinesBuffer = '';
+        for (const rowData of rows) {
+          csvLinesBuffer += columnsList.map(col => escapeCsvCell(rowData[col])).join(',') + '\n';
+        }
+
+        // Flush text string payload block out directly down the network wire network lane
+        outputStream.write(csvLinesBuffer);
+
+        // Adjust tracking mechanics for next boundary segment
+        currentOffset += rows.length;
+        if (rows.length < CHUNK_SIZE) {
+          activeFetchLoop = false;
+        }
+      }
+    } finally {
+      // Always return the client back safely to the core management cluster pool
+      client.release();
+    }
+  }
+  
 }

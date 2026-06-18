@@ -160,4 +160,37 @@ router.delete(
   }
 );
 
+// Export a database table as a streaming CSV file download
+router.get(
+  '/:tableName/export',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tableName } = req.params;
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+
+      // 1. Configure the response headers to stream an explicit file payload
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${schemaName}_${tableName}_export_${Date.now()}.csv"`
+      );
+      res.setHeader('Transfer-Encoding', 'chunked');
+
+      // 2. Fire the memory-isolated chunked data stream pipeline
+      await tableService.streamTableToCsv(schemaName, tableName, res);
+      
+      // 3. Close out the response loop cleanly
+      res.end();
+    } catch (error) {
+      // If headers haven't been flushed yet, pass the error along to the global logger pipeline
+      if (!res.headersSent) {
+        next(error);
+      } else {
+        console.error('Stream transmission context broken mid-transit:', error);
+      }
+    }
+  }
+);
+
 export { router as databaseTablesRouter };
