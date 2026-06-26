@@ -41,7 +41,8 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
-import mcpRouter from '@/api/routes/mcp/index.routes.js';
+// import { mcpRouter } from '@/api/routes/mcp/index.routes.js';
+// import mcpRouter from './api/routes/mcp/index.routes.js'; // ✅ Node-compliant relative path
 import { parseTrustProxySetting } from '@/utils/trust-proxy.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -218,7 +219,7 @@ export async function createApp() {
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
   apiRouter.use('/realtime', realtimeRouter);
-  apiRouter.use('/v1/mcp', mcpRouter);
+  // apiRouter.use('/v1/mcp', mcpRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);

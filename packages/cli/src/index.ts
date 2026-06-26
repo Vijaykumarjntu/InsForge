@@ -2,6 +2,8 @@ import { Command } from 'commander';
 import { registerGenTypesCommand } from './commands/gen-types.js';
 import { registerDbCommands } from './commands/db'; // Import the new killer whale!
 import { registerMcpCommands } from './commands/mcp.js'; // Look here!
+import { registerAuthTestCommand } from './commands/auth-test.ts'; // Look here!
+import {registerTemplateCommand} from './commands/template.ts'; // Look here!
 
 const program = new Command();
 
@@ -14,5 +16,8 @@ program
 registerGenTypesCommand(program);
 registerDbCommands(program);
 registerMcpCommands(program); // Lock and load!
+registerAuthTestCommand(program); // Lock and load!
+registerTemplateCommand(program); // Lock and load!
 // Boot the program and parse your terminal options
 program.parse(process.argv);
+
